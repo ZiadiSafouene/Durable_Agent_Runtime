@@ -26,7 +26,7 @@ side effects or LLM calls.
 ## Requirements
 
 - Python 3.11 – 3.13 (the `asyncmy` driver does not yet ship wheels for 3.14)
-- MySQL 8.0 (a Docker Compose service is provided)
+- MySQL 8.0, installed locally or otherwise reachable from the application
 
 ## Quick start
 
@@ -37,13 +37,42 @@ python -m venv .venv
 # source .venv/bin/activate       # macOS / Linux
 pip install -e ".[dev]"
 
-# 2. Configure
+# 2. Create your local configuration
 copy .env.example .env            # Windows
 # cp .env.example .env            # macOS / Linux
 
-# 3. Start MySQL
-docker compose up -d
+# 3. Edit .env and set DATABASE_URL and TEST_DATABASE_URL to your local
+#    MySQL username, password, host, and database names (see below).
+```
 
+Create the application and test databases and a MySQL user with access to them.
+Run this SQL while connected to your local MySQL server as an administrator;
+replace the example password with your own:
+
+```sql
+CREATE DATABASE durable_agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE durable_agent_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE USER 'durable'@'localhost' IDENTIFIED BY 'replace-with-a-strong-password';
+GRANT ALL PRIVILEGES ON durable_agent.* TO 'durable'@'localhost';
+GRANT ALL PRIVILEGES ON durable_agent_test.* TO 'durable'@'localhost';
+```
+
+Set these values in `.env`, using the password you chose above:
+
+```dotenv
+DATABASE_URL=mysql+asyncmy://durable:replace-with-a-strong-password@localhost:3306/durable_agent
+TEST_DATABASE_URL=mysql+asyncmy://durable:replace-with-a-strong-password@localhost:3306/durable_agent_test
+```
+
+If your password contains URL-reserved characters (such as `@`, `:`, `/`, or
+`#`), percent-encode those characters in the URL. `DATABASE_SYNC_URL` and
+`TEST_DATABASE_SYNC_URL` can be omitted; Alembic derives the synchronous
+PyMySQL URLs from the async URLs.
+
+With your local MySQL service running and `.env` configured, run:
+
+```bash
 # 4. Create / update the schema
 alembic upgrade head
 
@@ -51,6 +80,11 @@ alembic upgrade head
 durable-api
 # or: uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+No Docker commands are needed for this setup. `compose.yaml` remains available
+as an optional way to run a separate MySQL instance instead. Keep
+`durable_agent_test` separate from any data you want to keep: the integration
+test setup clears tables in its configured test database.
 
 Create and inspect a run:
 
@@ -65,6 +99,28 @@ curl http://127.0.0.1:8000/runs/<run_id>/events
 
 Set `EMBEDDED_WORKER=false` and run `durable-worker` to scale execution
 separately from the API.
+
+## Streamlit explorer
+
+Install the optional UI dependencies in the project environment and launch the
+interactive explorer:
+
+```bash
+pip install -e ".[ui]"
+streamlit run app/ui.py
+```
+
+The sidebar defaults to `http://127.0.0.1:8000`; change it if the API is hosted
+elsewhere. The UI walks through the report workflow, creates runs, inspects
+reduced state and ordered events, retries failed runs, and previews replay
+decisions. Its SSE viewer can resume from a `Last-Event-ID`. The API Playground
+loads `/openapi.json` from the selected server and lets you call its operations
+with editable path parameters, query parameters, and JSON bodies. Swagger UI
+and ReDoc links are also provided.
+
+The built-in LLM provider is deterministic and local. Report saving and
+notifications are mock effects persisted in MySQL; the demo does not write
+files or send real notifications.
 
 ## HTTP API
 

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
@@ -15,15 +15,16 @@ from app.workers.worker import Worker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings: Settings = app.state.settings
+    state = app.state
+    settings: Settings = state.settings
     configure_logging(settings.log_level)
     container = build_container(settings)
-    app.state.container = container
+    state.container = container
     worker: Worker | None = None
     if settings.embedded_worker:
         worker = Worker(container.session_factory, container.engine, settings)
         await worker.start_background()
-        app.state.worker = worker
+        state.worker = worker
     try:
         yield
     finally:
@@ -54,4 +55,4 @@ app = create_app()
 
 def run() -> None:
     settings = get_settings()
-    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=False)
+    uvicorn.run("main:app", host=settings.host, port=settings.port, reload=False)

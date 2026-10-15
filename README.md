@@ -1,3 +1,5 @@
+![runtime](assets/runtime.png)
+
 # Durable Agent Runtime
 
 Crash-safe, replayable multi-step agent orchestration runtime.
